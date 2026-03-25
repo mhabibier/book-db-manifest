@@ -1,0 +1,48 @@
+# Two Services for PostgreSQL:
+#
+# 1. Headless Service — required by StatefulSet
+# 2. ClusterIP Service — used by book-service for DATABASE_URL
+#
+# Connection string for book-service:
+#   postgresql://<user>:<pass>@book-postgres.book-postgres.svc.cluster.local:5432/book_db
+
+---
+# Headless Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: book-postgres-headless
+  namespace: book-postgres
+  labels:
+    app.kubernetes.io/name:      book-postgres
+    app.kubernetes.io/component: database-headless
+spec:
+  type:      ClusterIP
+  clusterIP: None
+  selector:
+    app: book-postgres
+  ports:
+    - name:       postgres
+      port:       5432
+      targetPort: postgres
+      protocol:   TCP
+
+---
+# ClusterIP Service — used by book-service
+apiVersion: v1
+kind: Service
+metadata:
+  name: book-postgres
+  namespace: book-postgres
+  labels:
+    app.kubernetes.io/name:      book-postgres
+    app.kubernetes.io/component: database
+spec:
+  type: ClusterIP
+  selector:
+    app: book-postgres
+  ports:
+    - name:       postgres
+      port:       5432
+      targetPort: postgres
+      protocol:   TCP

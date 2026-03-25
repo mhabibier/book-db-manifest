@@ -1,0 +1,119 @@
+# PostgreSQL StatefulSet for book-service.
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: book-postgres
+  namespace: book-postgres
+  labels:
+    app.kubernetes.io/name:      book-postgres
+    app.kubernetes.io/component: database
+    app.kubernetes.io/version:   "16"
+spec:
+  serviceName: book-postgres-headless   # must match headless Service name
+  replicas: 1
+  selector:
+    matchLabels:
+      app: book-postgres
+  template:
+    metadata:
+      labels:
+        app:                         book-postgres
+        app.kubernetes.io/name:      book-postgres
+        app.kubernetes.io/component: database
+    spec:
+      # ── Security ─────────────────────────────────────────────────────────────
+      securityContext:
+        runAsUser:    999
+        runAsGroup:   999
+        fsGroup:      999
+        runAsNonRoot: true
+
+      terminationGracePeriodSeconds: 60
+
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name:          postgres
+              containerPort: 5432
+              protocol:      TCP
+
+          # ── Credentials from Secret ─────────────────────────────────────────
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: book-postgres-secret
+                  key:  POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: book-postgres-secret
+                  key:  POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: book-postgres-secret
+                  key:  POSTGRES_DB
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+
+          # ── Health probes ───────────────────────────────────────────────────
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - $(POSTGRES_USER)
+                - -d
+                - $(POSTGRES_DB)
+            initialDelaySeconds: 30
+            periodSeconds:       10
+            timeoutSeconds:      5
+            failureThreshold:    5
+
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - $(POSTGRES_USER)
+                - -d
+                - $(POSTGRES_DB)
+            initialDelaySeconds: 10
+            periodSeconds:       5
+            timeoutSeconds:      3
+            failureThreshold:    3
+            successThreshold:    1
+
+          # ── Resources ───────────────────────────────────────────────────────
+          resources:
+            requests:
+              cpu:    "100m"
+              memory: "256Mi"
+            limits:
+              cpu:    "500m"
+              memory: "512Mi"
+
+          # ── Volume mount ────────────────────────────────────────────────────
+          volumeMounts:
+            - name:      book-postgres-data
+              mountPath: /var/lib/postgresql/data
+
+  # ── PVC Template ─────────────────────────────────────────────────────────────
+  # PVC name: book-postgres-data-book-postgres-0
+  volumeClaimTemplates:
+    - metadata:
+        name: book-postgres-data
+        labels:
+          app.kubernetes.io/name:      book-postgres
+          app.kubernetes.io/component: storage
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi       # Book service may store more data (image metadata, etc.)
+        # storageClassName: ""  # Set to your StorageClass (Longhorn / OpenEBS / NFS)
