@@ -1,13 +1,3 @@
-# Two Services for PostgreSQL:
-#
-# 1. Headless Service — required by StatefulSet
-# 2. ClusterIP Service — used by book-service for DATABASE_URL
-#
-# Connection string for book-service:
-#   postgresql://<user>:<pass>@book-postgres.book-postgres.svc.cluster.local:5432/book_db
-
----
-# Headless Service
 apiVersion: v1
 kind: Service
 metadata:
