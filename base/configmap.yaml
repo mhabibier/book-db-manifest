@@ -1,3 +1,5 @@
+# PostgreSQL configuration for book-service database.
+
 apiVersion: v1
 kind: ConfigMap
 metadata:
